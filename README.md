@@ -2,6 +2,7 @@
 
 > **Automate trusted SSL certificates for HP iLO 4** — sign the iLO-generated CSR via the ACME DNS-01 challenge (Cloudflare) and upload the resulting certificate to the HP iLO 4 in a single `docker compose up`.
 
+[![Docker Hub](https://img.shields.io/docker/pulls/xorguy/hpilo_sign_upload?logo=docker&label=Docker%20Hub)](https://hub.docker.com/r/xorguy/hpilo_sign_upload)
 
 > [!NOTE]
 > This project was co-authored with the assistance of AI. All code and documentation have been reviewed and tested by the author.
@@ -93,14 +94,15 @@ No certificate authority credentials, private keys, or iLO passwords are ever ba
 
 ```
 hpilo_sign_upload/
-├── Dockerfile          # Python 3.12-slim + acme.sh + python-hpilo
-├── entrypoint.sh       # Phase 1: sign CSR with acme.sh (Cloudflare DNS-01)
-├── upload_cert.py      # Phase 2: upload signed cert to iLO via python-hpilo
-├── compose.yaml        # Docker Compose service definition
-├── requirements.txt    # Python dependencies (python-hpilo)
-├── .env.example        # Template for iLO + CSR path variables
-├── .env.cf.example     # Template for Cloudflare + ACME variables
-└── .gitignore          # Excludes .env, .env.cf, *.pem, *.key, *.csr
+├── Dockerfile              # Python 3.12-slim + acme.sh + python-hpilo
+├── entrypoint.sh           # Phase 1: sign CSR with acme.sh (Cloudflare DNS-01)
+├── upload_cert.py          # Phase 2: upload signed cert to iLO via python-hpilo
+├── compose.yaml            # Docker Compose — build from source
+├── compose.prebuilt.yaml   # Docker Compose — use pre-built ARM64 image from Docker Hub
+├── requirements.txt        # Python dependencies (python-hpilo)
+├── .env.example            # Template for iLO + CSR path variables
+├── .env.cf.example         # Template for Cloudflare + ACME variables
+└── .gitignore              # Excludes .env, .env.cf, *.pem, *.key, *.csr
 ```
 
 ---
@@ -124,6 +126,8 @@ hpilo_sign_upload/
 git clone https://github.com/<your-username>/hpilo_sign_upload.git
 cd hpilo_sign_upload
 ```
+
+> **ARM64 / Raspberry Pi users:** A pre-built image is published on Docker Hub at [`xorguy/hpilo_sign_upload`](https://hub.docker.com/r/xorguy/hpilo_sign_upload). Skip the local build by using `compose.prebuilt.yaml` instead of `compose.yaml` (see [step 5](#5-run)).
 
 ### 3. Configure Cloudflare credentials
 
@@ -164,9 +168,19 @@ export CSR_PATH=/srv/ilo/ilo.csr
 
 ### 5. Run
 
+**Building from source** (all platforms):
+
 ```bash
 docker compose up --build
 ```
+
+**Using the pre-built ARM64 image** (no build required):
+
+```bash
+docker compose -f compose.prebuilt.yaml up
+```
+
+The pre-built image is available at [hub.docker.com/r/xorguy/hpilo_sign_upload](https://hub.docker.com/r/xorguy/hpilo_sign_upload) and targets `linux/arm64`.
 
 Expected output:
 
