@@ -2,8 +2,6 @@
 
 > **Automate trusted SSL certificates for HP iLO 4** — sign the iLO-generated CSR via the ACME DNS-01 challenge (Cloudflare) and upload the resulting certificate to the HP iLO 4 in a single `docker compose up`.
 
-[![Docker Hub](https://img.shields.io/docker/pulls/xorguy/hpilo_sign_upload?logo=docker&label=Docker%20Hub)](https://hub.docker.com/r/xorguy/hpilo_sign_upload)
-
 > [!NOTE]
 > This project was co-authored with the assistance of AI. All code and documentation have been reviewed and tested by the author.
 
@@ -175,6 +173,8 @@ docker compose up --build
 ```
 
 **Using the pre-built ARM64 image** (no build required):
+
+[![Docker Hub](https://img.shields.io/docker/pulls/xorguy/hpilo_sign_upload?logo=docker&label=Docker%20Hub)](https://hub.docker.com/r/xorguy/hpilo_sign_upload)
 
 ```bash
 docker compose -f compose.prebuilt.yaml up
