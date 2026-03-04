@@ -1,0 +1,13 @@
+# iLO Certs Python — never commit credentials or certificates
+.env
+certs/
+*.pem
+*.crt
+*.key
+
+.env.cf
+*.csr
+
+# Keep the example env files
+!.env.example
+!.env.cf.example
