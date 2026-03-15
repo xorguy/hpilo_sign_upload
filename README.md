@@ -16,7 +16,7 @@
   - [Prerequisites](#prerequisites)
   - [Project Structure](#project-structure)
   - [Quick Start](#quick-start)
-    - [1. Export the CSR from iLO](#1-export-the-csr-from-ilo)
+    - [1. Generate the CSR on iLO](#1-generate-the-csr-on-ilo)
     - [2. Clone the repository](#2-clone-the-repository)
     - [3. Configure Cloudflare credentials](#3-configure-cloudflare-credentials)
     - [4. Configure iLO credentials](#4-configure-ilo-credentials)
@@ -42,6 +42,7 @@ HP iLO 4 ships with a self-signed certificate, which causes browser warnings and
 This project automates steps 2 and 3 inside a Docker container:
 
 - **[acme.sh](https://github.com/acmesh-official/acme.sh)** handles the ACME DNS-01 challenge against Cloudflare to sign the CSR with a public CA (ZeroSSL by default, Let's Encrypt also supported).
+- **[download_csr.py](download_csr.py)** can fetch the current CSR directly from iLO if you do not provide one via a host mount.
 - **[python-hpilo](https://github.com/seveas/python-hpilo)** uploads the signed certificate to iLO over its XML API.
 
 No certificate authority credentials, private keys, or iLO passwords are ever baked into the image.
@@ -54,11 +55,16 @@ No certificate authority credentials, private keys, or iLO passwords are ever ba
 ┌─────────────────────────────────────────────────────────────┐
 │  Docker container                                           │
 │                                                             │
-│  Phase 1 ── entrypoint.sh                                  │
-│    acme.sh --signcsr                                        │
-│      ├── reads  /csr/ilo.csr   (host-mounted, read-only)   │
+│  Phase 0 ── entrypoint.sh                                  │
+│    if /csr/ilo.csr exists:                                  │
+│      └── use host-mounted CSR (read-only)                   │
+│    else:                                                    │
+│      └── download current CSR from iLO via XML API          │
+│                                                             │
+│  Phase 1 ── acme.sh --signcsr                              │
+│      ├── reads CSR from /csr/ilo.csr or /tmp/ilo_*.csr     │
 │      ├── creates TXT record in Cloudflare DNS               │
-│      ├── waits for propagation                             │
+│      ├── waits for propagation                              │
 │      └── writes signed cert to /root/.acme.sh/<DOMAIN>/    │
 │                                                             │
 │  Phase 2 ── upload_cert.py                                 │
@@ -93,12 +99,13 @@ No certificate authority credentials, private keys, or iLO passwords are ever ba
 ```
 hpilo_sign_upload/
 ├── Dockerfile              # Python 3.12-slim + acme.sh + python-hpilo
-├── entrypoint.sh           # Phase 1: sign CSR with acme.sh (Cloudflare DNS-01)
+├── entrypoint.sh           # Resolve CSR source, sign it, then upload the cert
+├── download_csr.py         # Optional Phase 0: download the current CSR from iLO
 ├── upload_cert.py          # Phase 2: upload signed cert to iLO via python-hpilo
 ├── compose.yaml            # Docker Compose — build from source
 ├── compose.prebuilt.yaml   # Docker Compose — use pre-built ARM64 image from Docker Hub
 ├── requirements.txt        # Python dependencies (python-hpilo)
-├── .env.example            # Template for iLO + CSR path variables
+├── .env.example            # Template for iLO + optional CSR directory variables
 ├── .env.cf.example         # Template for Cloudflare + ACME variables
 └── .gitignore              # Excludes .env, .env.cf, *.pem, *.key, *.csr
 ```
@@ -107,14 +114,15 @@ hpilo_sign_upload/
 
 ## Quick Start
 
-### 1. Export the CSR from iLO
+### 1. Generate the CSR on iLO
 
 1. Log in to the iLO web interface.
 2. Navigate to **Administration → Security → SSL Certificate**.
 3. Fill in the certificate subject fields (Common Name **must** match the hostname you use to reach iLO, e.g. `ilo.example.com`), **DO NOT CHECK** "include iLO IP Address(es)".
 4. Click **Generate CSR** and wait a few minutes for the process to complete.
-5. Return to the SSL Certificate page, click **Generate CSR**, and copy the contents of the downloaded file (including `-----BEGIN CERTIFICATE REQUEST-----` and `-----END CERTIFICATE REQUEST-----`).
-6. Save the file to a path on the Docker host, e.g. `/srv/ilo/ilo.csr`.
+5. Do one of the following:
+  - **Recommended with `compose.yaml`:** leave the CSR on iLO and let the container download it automatically.
+  - **Manual / pre-built image flow:** return to the SSL Certificate page, click **Generate CSR**, and save the downloaded file as `ilo.csr` inside a host directory, for example `/srv/ilo/ilo.csr`.
 
 > **Important:** Do not generate a new CSR after this step. iLO regenerates the private key each time — if the private key changes, a previously signed certificate becomes invalid.
 
@@ -139,7 +147,7 @@ Fill in the values (see [Configuration Reference](#cloudflare--acme-envcf) below
 
 ### 4. Configure iLO credentials
 
-The iLO host, user, password, and CSR path are passed via the `environment` block in `compose.yaml`. The simplest approach is to use a `.env` file:
+The iLO host, user, password, and optional CSR directory are passed via `.env`. The simplest approach is:
 
 ```bash
 cp .env.example .env
@@ -155,14 +163,37 @@ env_file:
   - .env          # add this line
 ```
 
-Or export the variables in your shell before running compose:
+For the default source-build flow in `compose.yaml`, you have two options:
+
+**Option A: Let the container download the CSR from iLO**
+
+- Set `ILO_HOST`, `ILO_USER`, and `ILO_PASS`.
+- Leave `CSR_DIR` unset.
+- Make sure a CSR has already been generated on the iLO.
+
+Example:
 
 ```bash
 export ILO_HOST=192.168.1.10
 export ILO_USER=Administrator
 export ILO_PASS=yourpassword
-export CSR_PATH=/srv/ilo/ilo.csr
 ```
+
+**Option B: Provide a host-mounted CSR directory**
+
+- Save the CSR file as `ilo.csr` inside a host directory.
+- Set `CSR_DIR` to that directory.
+
+Example:
+
+```bash
+export ILO_HOST=192.168.1.10
+export ILO_USER=Administrator
+export ILO_PASS=yourpassword
+export CSR_DIR=/srv/ilo
+```
+
+> **Pre-built ARM64 image note:** `compose.prebuilt.yaml` currently mounts a CSR file directly and still expects `CSR_PATH=/path/to/ilo.csr`.
 
 ### 5. Run
 
@@ -185,6 +216,9 @@ The pre-built image is available at [hub.docker.com/r/xorguy/hpilo_sign_upload](
 Expected output:
 
 ```bash
+=== [Phase 0/3] No CSR at /csr/ilo.csr — downloading from iLO ===
+Connecting to iLO at 192.168.1.10 to download CSR...
+CSR downloaded and saved to /tmp/ilo_downloaded.csr
 === [Phase 1/2] Signing CSR with acme.sh (Cloudflare DNS) ===
 ...
 === [Phase 2/2] Uploading signed certificate to iLO ===
@@ -217,8 +251,14 @@ After ~60 seconds, open the iLO web interface — the browser should trust the c
 | `ILO_HOST` | *(required)* | IP address or hostname of the iLO management interface |
 | `ILO_USER` | `Administrator` | iLO username |
 | `ILO_PASS` | *(required)* | iLO password |
-| `CSR_PATH` | *(required)* | **Host-side** absolute path to the CSR file exported from iLO. Mounted read-only into the container at `/csr/ilo.csr`. |
+| `CSR_DIR` | *(unset)* | Optional **host-side** directory containing `ilo.csr`. With `compose.yaml`, this directory is mounted read-only at `/csr`. If unset, the container downloads the CSR directly from iLO instead. |
 | `CERT_PATH` | `/certs/signed_cert.pem` | Container-side path to the signed certificate. Set automatically by `entrypoint.sh`; override only if you are running `upload_cert.py` standalone. |
+
+For `compose.prebuilt.yaml`, use `CSR_PATH` instead:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CSR_PATH` | *(required in `compose.prebuilt.yaml`)* | **Host-side** absolute path to the CSR file exported from iLO. Mounted read-only into the container at `/csr/ilo.csr`. |
 
 ---
 
@@ -243,7 +283,8 @@ services:
 - **Keep `.env` and `.env.cf` out of version control.** The `.gitignore` already excludes them; verify with `git status` before pushing.
 - **Cloudflare API token scope:** Create a scoped token with only `Zone:DNS:Edit` on the specific zone. Avoid using the global API key.
 - **iLO SSL verification is disabled** (`ssl_verify=False` in `upload_cert.py`) because iLO's existing certificate is self-signed at upload time. This is intentional and limited to the upload connection only.
-- **CSR is mounted read-only** (`:ro`) — the container cannot modify the source CSR file.
+- **CSR is mounted read-only** (`:ro`) when you provide `CSR_DIR` or `CSR_PATH` — the container cannot modify the source CSR file.
+- **Automatic CSR download does not generate a CSR for you.** iLO must already have a current CSR available to retrieve.
 
 ---
 
@@ -251,6 +292,12 @@ services:
 
 **`ERROR: Missing required environment variables: ILO_HOST, ILO_PASS`**
 → Ensure the variables are exported or present in `.env` / `compose.yaml`'s `environment` block.
+
+**`ERROR: Failed to retrieve CSR from iLO: ...`**
+→ No CSR is currently available to download from iLO, or the account lacks the required privilege. Generate the CSR in the iLO interface first, or provide `CSR_DIR` with a host-side `ilo.csr` file.
+
+**`ERROR: iLO did not return a valid PEM-encoded CSR.`**
+→ The CSR retrieval succeeded, but iLO did not return a usable PEM payload. Regenerate the CSR in iLO and retry.
 
 **`ERROR: Certificate file not found at /root/.acme.sh/<DOMAIN>/<DOMAIN>.cer`**
 → acme.sh failed to sign the CSR. Check that:
