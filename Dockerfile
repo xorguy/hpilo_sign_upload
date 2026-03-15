@@ -20,8 +20,9 @@ RUN git clone --depth=1 https://github.com/acmesh-official/acme.sh.git /tmp/acme
     && rm -rf /tmp/acme.sh
 
 # Copy scripts
-COPY upload_cert.py /app/upload_cert.py
-COPY entrypoint.sh  /app/entrypoint.sh
+COPY upload_cert.py   /app/upload_cert.py
+COPY download_csr.py  /app/download_csr.py
+COPY entrypoint.sh    /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
 # /csr : host-mounted CSR file (read-only at runtime)
