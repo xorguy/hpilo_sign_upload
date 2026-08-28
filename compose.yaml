@@ -11,7 +11,8 @@ services:
     volumes:
       # Optional: host directory containing ilo.csr (set CSR_DIR in .env).
       # If CSR_DIR is unset the named volume below is mounted (empty), and
-      # the entrypoint will download the CSR directly from iLO instead.
+      # the entrypoint asks iLO for its current CSR instead — generating a
+      # new one there (CN=$DOMAIN, from .env.cf) if iLO doesn't have one yet.
       - ${CSR_DIR:-csr_empty}:/csr:ro
     network_mode: "bridge"
     # If the iLO is on a management VLAN that requires the host's network

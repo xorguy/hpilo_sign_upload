@@ -11,3 +11,8 @@ certs/
 # Keep the example env files
 !.env.example
 !.env.cf.example
+
+# Claude Code local config, agents, memory
+.claude/
+.claudeignore
+CLAUDE.md
