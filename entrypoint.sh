@@ -14,14 +14,25 @@ else
     CSR_PATH="${CSR_DOWNLOADED}"
 fi
 
-echo "=== [Phase 1/2] Signing CSR with acme.sh (Cloudflare DNS) ==="
-/root/.acme.sh/acme.sh --signcsr \
+CA_SERVER="${CA_SERVER:-zerossl}"
+CA_EAB_KID="${CA_EAB_KID:-}"
+CA_EAB_HMAC_KEY="${CA_EAB_HMAC_KEY:-}"
+
+echo "=== [Phase 1/2] Signing CSR with acme.sh (CA: ${CA_SERVER}, Cloudflare DNS) ==="
+ACME_ARGS=(--signcsr \
   --csr "${CSR_PATH}" \
   --dns dns_cf \
   -d "${DOMAIN}" \
   --keylength 2048 \
   --dnssleep 5 \
-  --accountemail "${ACME_EMAIL}"
+  --accountemail "${ACME_EMAIL}" \
+  --server "${CA_SERVER}")
+
+if [ -n "${CA_EAB_KID}" ] && [ -n "${CA_EAB_HMAC_KEY}" ]; then
+    ACME_ARGS+=(--eab-kid "${CA_EAB_KID}" --eab-hmac-key "${CA_EAB_HMAC_KEY}")
+fi
+
+/root/.acme.sh/acme.sh "${ACME_ARGS[@]}"
 
 SIGNED_CERT="/root/.acme.sh/${DOMAIN}/${DOMAIN}.cer"
 

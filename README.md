@@ -41,7 +41,7 @@ HP iLO 4 ships with a self-signed certificate, which causes browser warnings and
 
 This project automates steps 2 and 3 inside a Docker container:
 
-- **[acme.sh](https://github.com/acmesh-official/acme.sh)** handles the ACME DNS-01 challenge against Cloudflare to sign the CSR with a public CA (ZeroSSL by default, Let's Encrypt also supported).
+- **[acme.sh](https://github.com/acmesh-official/acme.sh)** handles the ACME DNS-01 challenge against Cloudflare to sign the CSR with a public CA — ZeroSSL by default, selectable via `CA_SERVER` (Let's Encrypt, Buypass, or any other CA acme.sh supports).
 - **[download_csr.py](download_csr.py)** can fetch the current CSR directly from iLO if you do not provide one via a host mount.
 - **[python-hpilo](https://github.com/seveas/python-hpilo)** uploads the signed certificate to iLO over its XML API.
 
@@ -253,6 +253,13 @@ After ~60 seconds, open the iLO web interface — the browser should trust the c
 | `ILO_PASS` | *(required)* | iLO password |
 | `CSR_DIR` | *(unset)* | Optional **host-side** directory containing `ilo.csr`. With `compose.yaml`, this directory is mounted read-only at `/csr`. If unset, the container downloads the CSR directly from iLO instead. |
 | `CERT_PATH` | `/certs/signed_cert.pem` | Container-side path to the signed certificate. Set automatically by `entrypoint.sh`; override only if you are running `upload_cert.py` standalone. |
+| `CA_SERVER` | `zerossl` | ACME CA to sign against. acme.sh shortnames: `letsencrypt`, `letsencrypt_test`, `buypass`, `buypass_test`, `google`, `googletest`, `sslcom` — or a full ACME directory URL for any other CA acme.sh supports. |
+| `CA_EAB_KID` / `CA_EAB_HMAC_KEY` | *(unset)* | Optional External Account Binding credentials, required only by CAs that need them (e.g. `google`, `sslcom`). Leave both unset for `zerossl`/`letsencrypt`/`buypass`. |
+
+> **Selecting a different CA:** set `CA_SERVER` in `.env` to one of the shortnames above (or a
+> custom ACME directory URL). No other config changes are needed for CAs like Let's Encrypt or
+> Buypass. CAs that require External Account Binding also need `CA_EAB_KID` and
+> `CA_EAB_HMAC_KEY` set together — get these from the CA's own account dashboard.
 
 For `compose.prebuilt.yaml`, use `CSR_PATH` instead:
 

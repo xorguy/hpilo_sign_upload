@@ -8,6 +8,9 @@ services:
       - ILO_HOST=${ILO_HOST}
       - ILO_USER=${ILO_USER:-Administrator}
       - ILO_PASS=${ILO_PASS}
+      - CA_SERVER=${CA_SERVER:-zerossl}
+      - CA_EAB_KID=${CA_EAB_KID:-}
+      - CA_EAB_HMAC_KEY=${CA_EAB_HMAC_KEY:-}
     volumes:
       # Optional: host directory containing ilo.csr (set CSR_DIR in .env).
       # If CSR_DIR is unset the named volume below is mounted (empty), and
