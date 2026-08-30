@@ -9,7 +9,7 @@ if [ -f "${CSR_MOUNTED}" ]; then
     echo "=== Using provided CSR from ${CSR_MOUNTED} ==="
     CSR_PATH="${CSR_MOUNTED}"
 else
-    echo "=== [Phase 0/3] No CSR at ${CSR_MOUNTED} — downloading from iLO ==="
+    echo "=== [Phase 0/3] No CSR at ${CSR_MOUNTED} — checking iLO (will generate one for CN=${DOMAIN:-<unset>} if none exists) ==="
     python /app/download_csr.py "${CSR_DOWNLOADED}"
     CSR_PATH="${CSR_DOWNLOADED}"
 fi

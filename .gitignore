@@ -11,3 +11,8 @@ certs/
 # Keep the example env files
 !.env.example
 !.env.cf.example
+
+# Ignore all claude
+
+CLAUDE.md
+.claude/
